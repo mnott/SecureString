@@ -379,14 +379,6 @@ public class SecureString {
 
 
   /**
-   * Reset the timer for the object.
-   */
-  protected synchronized void resetTimer() {
-    this.expiryTime.setTime(Calendar.getInstance().getTime().getTime() + (this.lifeTime * 1000));
-  }
-
-
-  /**
    * Updater thread used to update the string at the specified interval.
    */
   private class StringUpdater extends Thread {
