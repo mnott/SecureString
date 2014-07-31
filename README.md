@@ -15,7 +15,7 @@ array, hence avoiding it to survive too long on the heap. In addition,
 you can tell it to expire; if you do, it will create a separate thread
 which will check for whether or not to nullify that char array. And,
 you can tell it to actually not even store itself as a char array, but
-as a hash; in that case, it will convert it into a md5 version and
+as a hash; in that case, it will convert it into an SHA-512 hashed version and
 continue working with that.
 
 The only really overloaded methods - besides the timeout thread - are the

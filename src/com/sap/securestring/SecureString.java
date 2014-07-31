@@ -14,26 +14,29 @@ public class SecureString {
    */
   private char[]        str;
 
+
   /**
    * The Updater Thread.
    */
   private StringUpdater updater        = null;
+
 
   /**
    * Update interval for the String, in milliseconds.
    */
   private long          updateInterval = 1000;
 
-
   /**
    * The creation time for the Object.
    */
   private Date          creationTime   = new Date();
 
+
   /**
    * The expiry time for the Object.
    */
   private Date          expiryTime     = new Date();
+
 
   /**
    * Whether or not an object may life forever. Creating a String with a
@@ -41,11 +44,11 @@ public class SecureString {
    */
   private boolean       livesForever   = false;
 
+
   /**
    * The actual lifetime of the object.
    */
   private long          lifeTime       = -1;
-
 
   /**
    * Whether the updater thread was started.
@@ -54,17 +57,16 @@ public class SecureString {
    */
   private boolean       updaterStarted = false;
 
-
   /**
    * Set to true to get some output.
    */
   private boolean       debug          = false;
 
+
   /**
    * Whether the string was hashed.
    */
   private boolean       hashed         = false;
-
 
   /**
    * The default constructor is just there.
@@ -122,7 +124,7 @@ public class SecureString {
     this.livesForever = true;
     this.hashed       = hashed;
     if (hashed) {
-      this.str = md5(str);
+      this.str = hash(str);
     } else {
       this.str = str.toCharArray();
     }
@@ -152,11 +154,12 @@ public class SecureString {
 
     this.hashed = hashed;
     if (hashed) {
-      this.str = md5(str);
+      this.str = hash(str);
     } else {
       this.str = str.toCharArray();
     }
   }
+
 
   /**
    * Get a quick status.
@@ -285,14 +288,14 @@ public class SecureString {
 
 
   /**
-   * Some md5 function.
+   * Some hash function.
    *
    * @param str
    * @return
    */
-  public static char[] md5(String str) {
+  public static char[] hash(String str) {
     try {
-      final MessageDigest md = MessageDigest.getInstance("MD5");
+      final MessageDigest md = MessageDigest.getInstance("SHA-512");
       md.update(str.getBytes());
 
       final byte[] hash   = md.digest();
@@ -377,7 +380,6 @@ public class SecureString {
     return this.expiryTime.before(currentTime);
   }
 
-
   /**
    * Updater thread used to update the string at the specified interval.
    */
@@ -387,11 +389,11 @@ public class SecureString {
      */
     private SecureString parent = null;
 
+
     /**
      * Whether or not the Thread is active.
      */
     private boolean      active = true;
-
 
     /**
      * Run the updater thread.
