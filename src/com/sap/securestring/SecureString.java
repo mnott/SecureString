@@ -85,8 +85,9 @@ public class SecureString {
    */
   public SecureString(String str) {
     this();
-    this.str          = str.toCharArray();
     this.livesForever = true;
+    this.hashed       = true;
+    this.str          = hash(str);
   }
 
 
@@ -100,7 +101,9 @@ public class SecureString {
    * @param lifetime The lifetime.
    */
   public SecureString(String str, long lifetime) {
-    this(str);
+    this();
+    this.hashed = true;
+    this.str    = hash(str);
     if (lifetime >= 0) {
       this.updater = new StringUpdater();
       this.updater.setDaemon(true);

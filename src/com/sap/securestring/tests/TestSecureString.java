@@ -31,7 +31,7 @@ public class TestSecureString {
      */
     parameters.add("x|5500");
     parameters.add("y|500");
-    parameters.add("z|15500|true");
+    parameters.add("z|15500|false");
     parameters.add("a");
     parameters.add("y");
 
@@ -69,7 +69,7 @@ public class TestSecureString {
     /*
      * Find out whether we want to hash the String
      */
-    boolean hashed = false;
+    boolean hashed = true;
 
     if (pars.length > 2) {
       hashed = "true".equals(pars[2]);
