@@ -1,5 +1,9 @@
 package com.sap.securestring;
 
+import java.io.UnsupportedEncodingException;
+
+import java.nio.charset.Charset;
+
 import java.security.MessageDigest;
 import java.security.NoSuchAlgorithmException;
 
@@ -10,33 +14,30 @@ import java.util.Date;
 public class SecureString {
   /**
    * Internal char[] representation of the
-   * String or its md5 has.
+   * String or its hash.
    */
-  private char[]        str;
-
+  private char[]        string;
 
   /**
    * The Updater Thread.
    */
   private StringUpdater updater        = null;
 
-
   /**
    * Update interval for the String, in milliseconds.
    */
   private long          updateInterval = 1000;
+
 
   /**
    * The creation time for the Object.
    */
   private Date          creationTime   = new Date();
 
-
   /**
    * The expiry time for the Object.
    */
   private Date          expiryTime     = new Date();
-
 
   /**
    * Whether or not an object may life forever. Creating a String with a
@@ -44,11 +45,11 @@ public class SecureString {
    */
   private boolean       livesForever   = false;
 
-
   /**
    * The actual lifetime of the object.
    */
   private long          lifeTime       = -1;
+
 
   /**
    * Whether the updater thread was started.
@@ -57,16 +58,23 @@ public class SecureString {
    */
   private boolean       updaterStarted = false;
 
+
   /**
    * Set to true to get some output.
    */
   private boolean       debug          = false;
 
-
   /**
    * Whether the string was hashed.
    */
   private boolean       hashed         = false;
+
+
+  /**
+   * Encoding to use.
+   */
+  private Charset       charset        = Charset.forName("UTF-8");
+
 
   /**
    * The default constructor is just there.
@@ -81,13 +89,59 @@ public class SecureString {
    * char array, but we do assume this then
    * lives forever.
    *
+   * It uses the UTF-8 character set.
+   *
    * @param str The string.
    */
   public SecureString(String str) {
     this();
     this.livesForever = true;
     this.hashed       = true;
-    this.str          = hash(str);
+    this.string       = hash(str);
+  }
+
+
+  /**
+   * If we pass a String, we convert it into
+   * char array, but we do assume this then
+   * lives forever.
+   *
+   * @param str The string.
+   * @param charset The character set.
+   */
+  public SecureString(String str, String charset) {
+    this();
+    this.charset      = Charset.forName(charset);
+    this.livesForever = true;
+    this.hashed       = true;
+    this.string       = hash(str);
+  }
+
+
+  /**
+   * If we pass a lifetime, we also want to
+   * have some concurrent thread check whether
+   * that string should still survive down the
+   * road.
+   *
+   * It uses the UTF-8 character set.
+   *
+   * @param str The string.
+   * @param lifetime The lifetime.
+   */
+  public SecureString(String str, long lifetime) {
+    this();
+    this.hashed = true;
+    this.string = hash(str);
+    if (lifetime >= 0) {
+      this.updater = new StringUpdater();
+      this.updater.setDaemon(true);
+      this.updater.setParent(this);
+      //this.updater.start(); // not until string expires
+      this.livesForever = false;
+      this.expiryTime.setTime(Calendar.getInstance().getTime().getTime() + (lifeTime * 1000));
+      startUpdater();
+    }
   }
 
 
@@ -98,12 +152,14 @@ public class SecureString {
    * road.
    *
    * @param str The string.
+   * @param charset The character set.
    * @param lifetime The lifetime.
    */
-  public SecureString(String str, long lifetime) {
+  public SecureString(String str, String charset, long lifetime) {
     this();
-    this.hashed = true;
-    this.str    = hash(str);
+    this.charset = Charset.forName(charset);
+    this.hashed  = true;
+    this.string  = hash(str);
     if (lifetime >= 0) {
       this.updater = new StringUpdater();
       this.updater.setDaemon(true);
@@ -119,6 +175,8 @@ public class SecureString {
   /**
    * If we want to hash the String, we can do so.
    *
+   * It uses the UTF-8 character set.
+   *
    * @param str The string.
    * @param hashed Whether to keep it hashed.
    */
@@ -127,9 +185,29 @@ public class SecureString {
     this.livesForever = true;
     this.hashed       = hashed;
     if (hashed) {
-      this.str = hash(str);
+      this.string = hash(str);
     } else {
-      this.str = str.toCharArray();
+      this.string = str.toCharArray();
+    }
+  }
+
+
+  /**
+   * If we want to hash the String, we can do so.
+   *
+   * @param str The string.
+   * @param charset The character set.
+   * @param hashed Whether to keep it hashed.
+   */
+  public SecureString(String str, String charset, boolean hashed) {
+    this();
+    this.charset      = Charset.forName(charset);
+    this.livesForever = true;
+    this.hashed       = hashed;
+    if (hashed) {
+      this.string = hash(str);
+    } else {
+      this.string = str.toCharArray();
     }
   }
 
@@ -137,6 +215,8 @@ public class SecureString {
   /**
    * Finally, a string can not only have a lifetime,
    * but also be hashed for the paranoid among us.
+   *
+   * It uses the UTF-8 character set.
    *
    * @param str The string.
    * @param lifetime The lifetime.
@@ -157,9 +237,41 @@ public class SecureString {
 
     this.hashed = hashed;
     if (hashed) {
-      this.str = hash(str);
+      this.string = hash(str);
     } else {
-      this.str = str.toCharArray();
+      this.string = str.toCharArray();
+    }
+  }
+
+
+  /**
+   * Finally, a string can not only have a lifetime,
+   * but also be hashed for the paranoid among us.
+   *
+   * @param str The string.
+   * @param charset The character set.
+   * @param lifetime The lifetime.
+   * @param hashed Whether to keep it hashed.
+   */
+  public SecureString(String str, String charset, long lifetime, boolean hashed) {
+    this();
+    this.charset  = Charset.forName(charset);
+    this.lifeTime = lifetime;
+    if (lifetime >= 0) {
+      this.updater = new StringUpdater();
+      this.updater.setDaemon(true);
+      this.updater.setParent(this);
+      //this.updater.start(); // not until string expires
+      this.livesForever = false;
+      this.expiryTime.setTime(Calendar.getInstance().getTime().getTime() + (lifetime));
+      startUpdater();
+    }
+
+    this.hashed = hashed;
+    if (hashed) {
+      this.string = hash(str);
+    } else {
+      this.string = str.toCharArray();
     }
   }
 
@@ -224,9 +336,9 @@ public class SecureString {
   /**
    * Some quick'n'dirty fail-early equals.
    *
-   * If we are md5 hashing, we're expecting
-   * the parameter to be an md5 hash as
-   * produced by our md5 function.
+   * If we are hashing, we're expecting
+   * the parameter to be a hash as
+   * produced by our hash function.
    *
    * @param with To compare with.
    * @return True if equals, else false.
@@ -236,11 +348,11 @@ public class SecureString {
 
     final int    l = b.length;
 
-    if (this.str == null) {
+    if (this.string == null) {
       return false;
     }
 
-    final char[] a = this.hashed ? this.toString().toCharArray() : this.str;
+    final char[] a = this.hashed ? this.toString().toCharArray() : this.string;
 
     if (a.length != l) {
       return false;
@@ -272,13 +384,13 @@ public class SecureString {
       System.out.println("Destroying: " + new Date() + " " + this.expired());
     }
 
-    if (this.str != null) {
-      final int l = this.str.length;
+    if (this.string != null) {
+      final int l = this.string.length;
       for (int i = 0; i < l; i++) {
-        str[i] = '\0'; // kidding
+        string[i] = '\0'; // kidding
       }
 
-      str = new char[0];
+      string = new char[0];
     }
 
     try {
@@ -294,12 +406,28 @@ public class SecureString {
    * Some hash function.
    *
    * @param str
-   * @return
+   * @return The hashed for the string.
    */
-  public static char[] hash(String str) {
+  public char[] hash(String str) {
+    return SecureString.hash(str, this.charset);
+  }
+
+
+  /**
+   * Some hash function.
+   *
+   * @param str
+   * @param charset The character set. If you want to use this function,
+   * you can create the character set like
+   * <pre>
+   *   final java.nio.charset.Charset charset = Charset.forName("UTF-8");
+   * </pre>
+   * @return The hashed for the string.
+   */
+  public static char[] hash(String str, Charset charset) {
     try {
       final MessageDigest md = MessageDigest.getInstance("SHA-512");
-      md.update(str.getBytes());
+      md.update(str.getBytes(charset));
 
       final byte[] hash   = md.digest();
       final int    l      = hash.length;
@@ -323,25 +451,25 @@ public class SecureString {
    * hashed, generates some hex string.
    */
   public synchronized String toString() {
-    if (this.str == null) {
+    if (this.string == null) {
       return "";
     }
 
     if (this.hashed) {
       final StringBuffer hexString = new StringBuffer();
-      final int          l         = this.str.length;
+      final int          l         = this.string.length;
       for (int i = 0; i < l; i++) {
-        if ((0xff & this.str[i]) < 0x10) {
-          hexString.append("0" + Integer.toHexString((0xFF & this.str[i])));
+        if ((0xff & this.string[i]) < 0x10) {
+          hexString.append("0" + Integer.toHexString((0xFF & this.string[i])));
         } else {
-          hexString.append(Integer.toHexString(0xFF & this.str[i]));
+          hexString.append(Integer.toHexString(0xFF & this.string[i]));
         }
       }
 
       return hexString.toString();
     }
 
-    return new String(this.str);
+    return new String(this.string);
   }
 
 
@@ -383,6 +511,7 @@ public class SecureString {
     return this.expiryTime.before(currentTime);
   }
 
+
   /**
    * Updater thread used to update the string at the specified interval.
    */
@@ -392,11 +521,11 @@ public class SecureString {
      */
     private SecureString parent = null;
 
-
     /**
      * Whether or not the Thread is active.
      */
     private boolean      active = true;
+
 
     /**
      * Run the updater thread.
@@ -408,8 +537,8 @@ public class SecureString {
         }
 
         synchronized (this) {
-          if (str != null) {
-            final int l = str.length;
+          if (string != null) {
+            final int l = string.length;
             if ((l > 0) && this.parent.expired()) {
               synchronized (this.parent) {
                 this.parent.destroy();
